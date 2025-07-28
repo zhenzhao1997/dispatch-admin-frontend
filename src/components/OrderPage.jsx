@@ -1,12 +1,13 @@
-// src/components/OrderPage.jsx - 完全仿照携程风格的订单管理界面
+// src/components/OrderPage.jsx - 修复版本 + SSE实时更新
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api.js';
+import useSSE from '../hooks/useSSE.js';
 import NewOrderModal from './NewOrderModal.jsx';
 import AssignDriverModal from './AssignDriverModal.jsx';
 import EditOrderModal from './EditOrderModal.jsx';
 import OrderDetailModal from './OrderDetailModal.jsx';
 
-// 状态配置 - 完全按照携程的颜色
+// 状态配置
 const getStatusConfig = (status) => {
     const statusMap = {
         0: { text: '待接单', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
@@ -26,127 +27,136 @@ const getOrderTypeDisplay = (orderType) => {
     const typeMap = {
         'AirportTransfer_Arrival': '接机',
         'AirportTransfer_Departure': '送机',
-        'AirportTransfer': '接送机', // 兼容原有数据
+        'AirportTransfer': '接送机',
         'Charter': '包车',
         'PointToPoint': '市内用车',
     };
     return typeMap[orderType] || orderType;
 };
 
-// 单个订单行组件 - 完全模仿携程的布局
+// 安全获取属性值的辅助函数
+const safeGet = (obj, path, defaultValue = '') => {
+    try {
+        return path.split('.').reduce((current, key) => {
+            if (current && typeof current === 'object' && key in current) {
+                return current[key];
+            }
+            return defaultValue;
+        }, obj);
+    } catch (error) {
+        console.warn('safeGet error:', error, 'path:', path, 'obj:', obj);
+        return defaultValue;
+    }
+};
+
+// 单个订单行组件
 const OrderRow = ({ order, onAssignClick, onEditClick, onDetailClick }) => {
     const statusConfig = getStatusConfig(order.Status);
-    const serviceTime = new Date(order.ServiceTime);
-    const orderTypeDisplay = getOrderTypeDisplay(order.OrderType);
     
-    // 格式化时间 - 携程风格
-    const timeDisplay = serviceTime.toLocaleTimeString('zh-CN', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
-    });
-    const dateDisplay = serviceTime.toLocaleDateString('zh-CN', { 
-        month: '2-digit', 
-        day: '2-digit' 
-    });
-    
+    // 安全处理时间显示
+    const formatServiceTime = (timeStr) => {
+        try {
+            const date = new Date(timeStr);
+            return date.toLocaleString('zh-CN', {
+                month: 'numeric',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (error) {
+            return timeStr || '未设置';
+        }
+    };
+
     return (
-        <div className="bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors">
-            <div className="px-6 py-4">
-                {/* 第一行：时间、类型、状态 */}
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-4">
-                        {/* 时间显示 - 大字体突出 */}
-                        <div className="flex items-baseline space-x-2">
-                            <span className="text-lg font-semibold text-gray-900">
-                                {orderTypeDisplay} {timeDisplay}
+        <div className="border-b border-gray-200 py-4 px-6 hover:bg-gray-50">
+            <div className="flex items-center justify-between">
+                {/* 左侧：基本信息 */}
+                <div className="flex-1">
+                    {/* 第一行：订单类型、状态、时间 */}
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-3">
+                            <span className="text-lg font-medium text-gray-900">
+                                {getOrderTypeDisplay(order.OrderType)}
                             </span>
-                            <span className="text-sm text-gray-500">{dateDisplay}</span>
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusConfig.bgColor} ${statusConfig.textColor}`}>
+                                {statusConfig.text}
+                            </span>
                         </div>
-                        
-                        {/* 状态标签 */}
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${statusConfig.bgColor} ${statusConfig.textColor}`}>
-                            {statusConfig.text}
-                        </span>
+                        <div className="text-right text-sm text-gray-500">
+                            <div>{formatServiceTime(order.ServiceTime)}</div>
+                            <div className="text-xs">订单号: #{order.ID}</div>
+                        </div>
                     </div>
                     
-                    {/* 右侧时间和订单号 */}
-                    <div className="text-right text-sm text-gray-500">
-                        <div>{timeDisplay}完成派单</div>
-                        <div className="text-xs">订单号码: {order.ID.toString().padStart(12, '0')}</div>
-                    </div>
-                </div>
-                
-                {/* 第二行：地址信息 */}
-                <div className="mb-3">
-                    <div className="flex items-start space-x-3">
-                        {/* 地址图标 */}
-                        <div className="flex flex-col items-center mt-1">
-                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            <div className="w-0.5 h-4 bg-gray-300 my-1"></div>
-                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                        </div>
-                        
-                        {/* 地址文本 */}
-                        <div className="flex-1 space-y-2">
-                            <div className="text-sm text-gray-900">
-                                {order.PickupAddress}
+                    {/* 第二行：地址信息 */}
+                    <div className="mb-3">
+                        <div className="flex items-start space-x-3">
+                            <div className="flex flex-col items-center mt-1">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <div className="w-0.5 h-4 bg-gray-300 my-1"></div>
+                                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                             </div>
-                            <div className="text-sm text-gray-900">
-                                {order.DropoffAddress}
+                            <div className="flex-1 space-y-2">
+                                <div className="text-sm text-gray-900">
+                                    起：{order.PickupAddress || '未设置'}
+                                </div>
+                                <div className="text-sm text-gray-900">
+                                    终：{order.DropoffAddress || '未设置'}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                
-                {/* 第三行：司机信息和其他详情 */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-6 text-sm text-gray-600">
-                        {/* 司机信息 */}
-                        {order.AssignedDriverName ? (
-                            <span>司机: {order.AssignedDriverName}</span>
-                        ) : (
-                            <span className="text-orange-600">未分配司机</span>
-                        )}
-                        
-                        {/* 乘客信息 */}
-                        <span>乘客: {order.PassengerCount || 1}人</span>
-                        
-                        {/* 行李信息 */}
-                        {order.LuggageCount > 0 && (
-                            <span>行李: {order.LuggageCount}件</span>
-                        )}
-                        
-                        {/* 航班信息 */}
-                        {order.FlightNumber && (
-                            <span>航班: {order.FlightNumber}</span>
-                        )}
-                    </div>
                     
-                    {/* 操作按钮 - 携程风格 */}
-                    <div className="flex items-center space-x-2">
-                        <button
-                            onClick={() => onDetailClick(order)}
-                            className="px-3 py-1 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
-                        >
-                            详情
-                        </button>
+                    {/* 第三行：详细信息 */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-6 text-sm text-gray-600">
+                            {/* 司机信息 */}
+                            {order.AssignedDriverName ? (
+                                <span>司机: {order.AssignedDriverName}</span>
+                            ) : (
+                                <span className="text-orange-600">未分配司机</span>
+                            )}
+                            
+                            {/* 乘客信息 */}
+                            <span>乘客: {order.PassengerCount || 1}人</span>
+                            
+                            {/* 行李信息 */}
+                            {order.LuggageCount > 0 && (
+                                <span>行李: {order.LuggageCount}件</span>
+                            )}
+                            
+                            {/* 航班信息 */}
+                            {order.FlightNumber && (
+                                <span>航班: {order.FlightNumber}</span>
+                            )}
+                        </div>
                         
-                        <button
-                            onClick={() => onEditClick(order)}
-                            className="px-3 py-1 text-xs text-gray-600 hover:text-gray-800 border border-gray-200 rounded hover:bg-gray-50 transition-colors"
-                        >
-                            编辑
-                        </button>
-                        
-                        {order.Status === 0 && (
+                        {/* 操作按钮 */}
+                        <div className="flex items-center space-x-2">
                             <button
-                                onClick={() => onAssignClick(order)}
-                                className="px-3 py-1 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+                                onClick={() => onDetailClick(order)}
+                                className="px-3 py-1 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
                             >
-                                派单
+                                详情
                             </button>
-                        )}
+                            
+                            <button
+                                onClick={() => onEditClick(order)}
+                                className="px-3 py-1 text-xs text-gray-600 hover:text-gray-800 border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+                            >
+                                编辑
+                            </button>
+                            
+                            {order.Status === 0 && (
+                                <button
+                                    onClick={() => onAssignClick(order)}
+                                    className="px-3 py-1 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+                                >
+                                    派单
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -168,20 +178,80 @@ function OrderPage() {
     const [filterStatus, setFilterStatus] = useState('all');
     const [filterType, setFilterType] = useState('all');
 
+    // 🆕 SSE实时通信
+    const { isConnected, lastEvent, error: sseError } = useSSE('admin');
+
     const fetchOrders = async () => {
         setIsLoading(true);
+        setError('');
         try {
+            console.log('🔍 开始获取订单列表...');
             const data = await api.get('/orders');
-            setOrders(Array.isArray(data) ? data : []);
-            setError('');
+            console.log('✅ 原始订单数据:', data);
+            
+            // 确保数据是数组格式
+            const ordersArray = Array.isArray(data) ? data : [];
+            console.log('📋 处理后的订单数组:', ordersArray);
+            
+            setOrders(ordersArray);
         } catch (err) {
-            setError(err.message);
+            console.error('❌ 获取订单失败:', err);
+            setError(err.message || '获取订单失败');
         } finally {
             setIsLoading(false);
         }
     };
 
-    useEffect(() => { fetchOrders(); }, []);
+    useEffect(() => { 
+        fetchOrders(); 
+    }, []);
+
+    // 🆕 处理SSE事件
+    useEffect(() => {
+        if (lastEvent) {
+            console.log('📨 处理SSE事件:', lastEvent);
+            
+            switch (lastEvent.type) {
+                case 'connected':
+                    console.log('✅ SSE连接成功:', lastEvent.data.message);
+                    break;
+                    
+                case 'order_created':
+                    console.log('🆕 新订单创建:', lastEvent.data);
+                    // 自动刷新订单列表
+                    fetchOrders();
+                    // 可以添加通知提示
+                    showNotification('新订单已创建', 'success');
+                    break;
+                    
+                case 'order_assigned':
+                    console.log('📋 订单已派单:', lastEvent.data);
+                    // 自动刷新订单列表
+                    fetchOrders();
+                    showNotification(`订单已分配给司机 ${lastEvent.data.driver_name}`, 'success');
+                    break;
+                    
+                case 'order_updated':
+                    console.log('🔄 订单已更新:', lastEvent.data);
+                    fetchOrders();
+                    break;
+                    
+                default:
+                    console.log('📨 未知事件类型:', lastEvent.type);
+            }
+        }
+    }, [lastEvent]);
+
+    // 🆕 显示通知的函数
+    const showNotification = (message, type = 'info') => {
+        // 这里可以集成更好的通知组件，现在先用简单的alert
+        if (type === 'success') {
+            console.log('✅ 通知:', message);
+        } else {
+            console.log('ℹ️ 通知:', message);
+        }
+        // TODO: 后续可以替换为更好的通知组件
+    };
 
     const handleModalClose = () => {
         setIsNewOrderModalOpen(false);
@@ -197,18 +267,41 @@ function OrderPage() {
     
     // 筛选订单
     const filteredOrders = orders.filter(order => {
-        const matchesStatus = filterStatus === 'all' || order.Status === parseInt(filterStatus);
-        const matchesType = filterType === 'all' || order.OrderType === filterType;
-        return matchesStatus && matchesType;
+        try {
+            const matchesStatus = filterStatus === 'all' || order.Status === parseInt(filterStatus);
+            const matchesType = filterType === 'all' || order.OrderType === filterType;
+            return matchesStatus && matchesType;
+        } catch (error) {
+            console.warn('筛选订单时出错:', error, order);
+            return false;
+        }
     });
 
     return (
         <div className="max-w-full">
-            {/* 页面头部 - 携程风格 */}
+            {/* 页面头部 */}
             <div className="bg-white border-b border-gray-200">
                 <div className="px-6 py-4">
                     <div className="flex justify-between items-center mb-4">
-                        <h1 className="text-2xl font-semibold text-gray-900">订单管理</h1>
+                        <div className="flex items-center space-x-4">
+                            <h1 className="text-2xl font-semibold text-gray-900">订单管理</h1>
+                            {/* 🆕 SSE连接状态指示器 */}
+                            <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs ${
+                                isConnected 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                                <div className={`w-2 h-2 rounded-full ${
+                                    isConnected ? 'bg-green-500' : 'bg-red-500'
+                                }`}></div>
+                                <span>{isConnected ? '实时连接正常' : '连接断开'}</span>
+                            </div>
+                            {sseError && (
+                                <div className="text-xs text-red-600">
+                                    SSE错误: {sseError}
+                                </div>
+                            )}
+                        </div>
                         <button 
                             onClick={() => setIsNewOrderModalOpen(true)}
                             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors"
@@ -217,7 +310,7 @@ function OrderPage() {
                         </button>
                     </div>
                     
-                    {/* 筛选栏 - 携程风格的标签页 */}
+                    {/* 筛选栏 */}
                     <div className="flex items-center space-x-1 border-b border-gray-200">
                         {/* 状态筛选 */}
                         <button
@@ -282,13 +375,13 @@ function OrderPage() {
                 </div>
             </div>
             
-            {/* 弹窗们 */}
+            {/* 弹窗组件 */}
             {isNewOrderModalOpen && <NewOrderModal onClose={() => setIsNewOrderModalOpen(false)} onSuccess={handleModalClose} />}
             {assigningOrder && <AssignDriverModal order={assigningOrder} onClose={() => setAssigningOrder(null)} onSuccess={handleModalClose} />}
             {editingOrder && <EditOrderModal order={editingOrder} onClose={() => setEditingOrder(null)} onSuccess={handleModalClose} />}
             {viewingOrderId && <OrderDetailModal orderId={viewingOrderId} onClose={() => setViewingOrderId(null)} />}
 
-            {/* 订单列表 - 携程风格的列表 */}
+            {/* 订单列表 */}
             <div className="bg-white">
                 {isLoading && (
                     <div className="text-center py-8">
@@ -299,6 +392,12 @@ function OrderPage() {
                 {error && (
                     <div className="px-6 py-4 text-red-600 bg-red-50 border-b border-red-200">
                         加载失败: {error}
+                        <button 
+                            onClick={fetchOrders}
+                            className="ml-4 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                        >
+                            重试
+                        </button>
                     </div>
                 )}
                 
@@ -308,7 +407,7 @@ function OrderPage() {
                     </div>
                 )}
                 
-                {!isLoading && !error && filteredOrders.map(order => (
+                {!isLoading && !error && filteredOrders.length > 0 && filteredOrders.map(order => (
                     <OrderRow 
                         key={order.ID} 
                         order={order}
