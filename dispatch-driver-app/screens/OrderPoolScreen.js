@@ -9,7 +9,7 @@ const OrderItem = ({ item }) => {
     const handleGrabPress = async () => {
         Alert.alert(
             "确认抢单",
-            `您确定要请求接收这笔去往 "${item.DropoffAddress}" 的订单吗？`,
+            `您确定要抢这笔去往 "${item.DropoffAddress}" 的订单吗？抢单成功后将直接分配给您！`,
             [
                 { text: "取消", style: "cancel" },
                 {
@@ -17,7 +17,7 @@ const OrderItem = ({ item }) => {
                     onPress: async () => {
                         try {
                             const response = await api.post(`/drivers/me/order-pool/${item.ID}/request-grab`, {});
-                            Alert.alert("成功", response.message || "请求已发送，请等待后台确认。");
+                            Alert.alert("成功", response.message || "抢单成功！订单已分配给您。");
                         } catch (error) {
                             Alert.alert("失败", error.message || "发送请求失败，请稍后再试。");
                         }
