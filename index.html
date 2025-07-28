@@ -4,10 +4,41 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>后台管理系统</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 使用稳定的Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com?v=3.4.0"></script>
+    <style>
+      /* 确保基础样式生效 */
+      * {
+        box-sizing: border-box;
+      }
+      
+      html, body, #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      
+      /* 临时内联样式确保显示 */
+      .loading-fallback {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #f9fafb;
+      }
+    </style>
   </head>
   <body class="h-full">
-    <div id="root" class="h-full"></div>
+    <div id="root" class="h-full">
+      <!-- 加载中的回退显示 -->
+      <div class="loading-fallback">
+        <div>
+          <h2>🚀 正在加载派单系统...</h2>
+          <p>如果长时间没有响应，请检查控制台错误信息</p>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
