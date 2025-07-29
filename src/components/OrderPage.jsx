@@ -6,6 +6,8 @@ import NewOrderModal from './NewOrderModal.jsx';
 import AssignDriverModal from './AssignDriverModal.jsx';
 import EditOrderModal from './EditOrderModal.jsx';
 import OrderDetailModal from './OrderDetailModal.jsx';
+import EnhancedOrderDetailModal from './EnhancedOrderDetailModal.jsx';
+
 
 // 状态配置
 const getStatusConfig = (status) => {
@@ -379,7 +381,7 @@ function OrderPage() {
             {isNewOrderModalOpen && <NewOrderModal onClose={() => setIsNewOrderModalOpen(false)} onSuccess={handleModalClose} />}
             {assigningOrder && <AssignDriverModal order={assigningOrder} onClose={() => setAssigningOrder(null)} onSuccess={handleModalClose} />}
             {editingOrder && <EditOrderModal order={editingOrder} onClose={() => setEditingOrder(null)} onSuccess={handleModalClose} />}
-            {viewingOrderId && <OrderDetailModal orderId={viewingOrderId} onClose={() => setViewingOrderId(null)} />}
+            {viewingOrderId && (<EnhancedOrderDetailModal orderId={viewingOrderId} onClose={() => setViewingOrderId(null)} />)}
 
             {/* 订单列表 */}
             <div className="bg-white">
