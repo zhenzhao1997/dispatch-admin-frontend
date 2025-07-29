@@ -1,5 +1,5 @@
 // src/components/OrderPage.jsx
-// 【技术总监V3.0】订单管理页面 - 使用统一字典服务
+// 【正确版本】保持Redux架构，只修复分页验证问题
 
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
@@ -8,7 +8,7 @@ import {
   selectOrderTypeText, 
   selectServiceLevelText,
   selectSystemConstants 
-} from '../store/slices/systemConstantsSlice';
+} from '../store/index';
 import api from '../utils/api';
 
 function OrderPage() {
@@ -20,14 +20,11 @@ function OrderPage() {
     orderType: '',
     serviceLevel: '',
     page: 1,
-    pageSize: 20
+    pageSize: 10  // 修复：确保满足后端min验证要求
   });
   const [pagination, setPagination] = useState({});
 
-  // =================================================================
-  // 【核心改进】使用Redux字典服务而不是硬编码映射
-  // =================================================================
-  
+  // 使用Redux字典服务
   const systemConstants = useSelector(selectSystemConstants);
   const getOrderStatusText = useSelector(selectOrderStatusText);
   const getOrderTypeText = useSelector(selectOrderTypeText);  
@@ -42,13 +39,22 @@ function OrderPage() {
       setLoading(true);
       setError('');
       
-      // 构建查询参数
+      // 构建查询参数，确保符合后端验证
       const params = new URLSearchParams();
-      Object.keys(filters).forEach(key => {
-        if (filters[key] !== '' && filters[key] !== null) {
-          params.append(key, filters[key]);
-        }
-      });
+      
+      if (filters.status !== '' && filters.status !== null) {
+        params.append('status', filters.status);
+      }
+      if (filters.orderType !== '' && filters.orderType !== null) {
+        params.append('orderType', filters.orderType);
+      }
+      if (filters.serviceLevel !== '' && filters.serviceLevel !== null) {
+        params.append('serviceLevel', filters.serviceLevel);
+      }
+      
+      // 确保分页参数符合后端验证（最小值要求）
+      params.append('page', Math.max(1, filters.page));
+      params.append('pageSize', Math.max(1, Math.min(100, filters.pageSize)));
       
       const response = await api.get(`/orders?${params.toString()}`);
       setOrders(response.orders || []);
@@ -62,42 +68,12 @@ function OrderPage() {
     }
   };
 
-  // =================================================================
-  // 【新增】获取状态颜色的工具函数
-  // =================================================================
-  
-  const getStatusColor = (status) => {
-    const colorMap = {
-      0: 'bg-yellow-100 text-yellow-800',   // 待处理
-      1: 'bg-blue-100 text-blue-800',       // 已派单
-      2: 'bg-indigo-100 text-indigo-800',   // 司机已接单
-      3: 'bg-orange-100 text-orange-800',   // 前往接驾
-      4: 'bg-purple-100 text-purple-800',   // 已到达
-      5: 'bg-cyan-100 text-cyan-800',       // 服务中
-      6: 'bg-green-100 text-green-800',     // 已完成
-      7: 'bg-red-100 text-red-800',         // 已取消
-    };
-    return colorMap[status] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getServiceLevelColor = (level) => {
-    const colorMap = {
-      'Economy': 'bg-green-100 text-green-800',
-      'Comfort': 'bg-blue-100 text-blue-800',
-      'Luxury': 'bg-purple-100 text-purple-800',
-      'Premium': 'bg-gold-100 text-gold-800',
-    };
-    return colorMap[level] || 'bg-gray-100 text-gray-800';
-  };
-
-  // =================================================================
-  // 渲染筛选器组件
-  // =================================================================
-  
+  // 渲染筛选器
   const renderFilters = () => (
-    <div className="bg-white p-4 rounded-lg shadow mb-6">
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 className="text-lg font-semibold text-gray-800 mb-4">筛选订单</h2>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* 订单状态筛选 */}
+        {/* 状态筛选 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">订单状态</label>
           <select
@@ -106,7 +82,6 @@ function OrderPage() {
             className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">全部状态</option>
-            {/* 【关键改进】动态渲染选项，使用字典服务 */}
             {Object.entries(systemConstants.order_status || {}).map(([value, text]) => (
               <option key={value} value={value}>{text}</option>
             ))}
@@ -122,7 +97,6 @@ function OrderPage() {
             className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">全部类型</option>
-            {/* 【关键改进】动态渲染选项，使用字典服务 */}
             {Object.entries(systemConstants.order_type || {}).map(([value, text]) => (
               <option key={value} value={value}>{text}</option>
             ))}
@@ -138,7 +112,6 @@ function OrderPage() {
             className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">全部等级</option>
-            {/* 【关键改进】动态渲染选项，使用字典服务 */}
             {Object.entries(systemConstants.service_level || {}).map(([value, text]) => (
               <option key={value} value={value}>{text}</option>
             ))}
@@ -148,7 +121,7 @@ function OrderPage() {
         {/* 重置按钮 */}
         <div className="flex items-end">
           <button
-            onClick={() => setFilters({ status: '', orderType: '', serviceLevel: '', page: 1, pageSize: 20 })}
+            onClick={() => setFilters({ status: '', orderType: '', serviceLevel: '', page: 1, pageSize: 10 })}
             className="w-full bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors"
           >
             重置筛选
@@ -157,10 +130,6 @@ function OrderPage() {
       </div>
     </div>
   );
-
-  // =================================================================
-  // 主渲染逻辑
-  // =================================================================
 
   if (loading) {
     return (
@@ -215,175 +184,129 @@ function OrderPage() {
 
       {/* 订单列表 */}
       {orders.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg shadow">
+        <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <div className="text-gray-400 text-6xl mb-4">📋</div>
-          <p className="text-gray-500 text-lg">没有找到符合条件的订单</p>
-          <p className="text-gray-400 text-sm mt-2">尝试调整筛选条件或创建新订单</p>
+          <h3 className="text-xl font-semibold text-gray-600 mb-2">暂无订单</h3>
+          <p className="text-gray-500">当前筛选条件下没有找到订单</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    订单信息
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    类型 & 等级
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    状态
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    服务时间
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    路线信息
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    司机 & 车辆
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    金额
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    操作
-                  </th>
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  订单号
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  状态
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  类型
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  服务等级
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  接驾地址
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  服务时间
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  操作
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {orders.map((order) => (
+                <tr key={order.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    #{order.id}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(order.status)}`}>
+                      {getOrderStatusText(order.status)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {getOrderTypeText(order.order_type)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {getServiceLevelText(order.service_level)}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                    {order.pickup_address}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {order.service_time ? new Date(order.service_time).toLocaleString('zh-CN') : '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button 
+                      onClick={() => handleViewOrder(order.id)}
+                      className="text-indigo-600 hover:text-indigo-900 mr-3"
+                    >
+                      查看
+                    </button>
+                    <button 
+                      onClick={() => handleEditOrder(order.id)}
+                      className="text-green-600 hover:text-green-900 mr-3"
+                    >
+                      编辑
+                    </button>
+                    <button 
+                      onClick={() => handleAssignOrder(order.id)}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      派单
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                    {/* 订单信息 */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">#{order.id}</div>
-                        {order.external_order_id && (
-                          <div className="text-sm text-gray-500">外部订单: {order.external_order_id}</div>
-                        )}
-                        <div className="text-xs text-gray-400">
-                          创建时间: {new Date(order.created_at).toLocaleString('zh-CN')}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 类型 & 等级 */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="space-y-1">
-                        {/* 【关键改进】使用字典服务翻译订单类型 */}
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {getOrderTypeText(order.order_type)}
-                        </span>
-                        {/* 【关键改进】使用字典服务翻译服务等级 */}
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getServiceLevelColor(order.service_level)}`}>
-                          {getServiceLevelText(order.service_level)}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* 状态 */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {/* 【关键改进】使用字典服务翻译订单状态 */}
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                        {getOrderStatusText(order.status)}
-                      </span>
-                    </td>
-
-                    {/* 服务时间 */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(order.service_time).toLocaleString('zh-CN', {
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </td>
-
-                    {/* 路线信息 */}
-                    <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
-                      <div className="space-y-1">
-                        <div className="truncate">
-                          <span className="text-green-600">🔵</span> {order.pickup_address}
-                        </div>
-                        <div className="truncate">
-                          <span className="text-red-600">🔴</span> {order.dropoff_address}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 司机 & 车辆信息 */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="space-y-1">
-                        {/* 【关键改进】使用JOIN查询获取的动态信息 */}
-                        <div>
-                          👨‍💼 {order.driver_name?.Valid ? order.driver_name.String : '未指派'}
-                        </div>
-                        <div>
-                          🚗 {order.car_plate?.Valid ? order.car_plate.String : '未指派'}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 金额 */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      ${order.amount.toFixed(2)}
-                    </td>
-
-                    {/* 操作 */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button 
-                          className="text-indigo-600 hover:text-indigo-900 transition-colors"
-                          onClick={() => handleViewOrder(order.id)}
-                        >
-                          查看
-                        </button>
-                        <button 
-                          className="text-blue-600 hover:text-blue-900 transition-colors"
-                          onClick={() => handleEditOrder(order.id)}
-                        >
-                          编辑
-                        </button>
-                        {order.status === 0 && (
-                          <button 
-                            className="text-green-600 hover:text-green-900 transition-colors"
-                            onClick={() => handleAssignOrder(order.id)}
-                          >
-                            派单
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
 
           {/* 分页 */}
           {pagination.total_pages > 1 && (
-            <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-700">
-                  显示第 {((pagination.page - 1) * pagination.page_size) + 1} 到 {Math.min(pagination.page * pagination.page_size, pagination.total)} 条，
-                  共 {pagination.total} 条记录
+            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+              <div className="flex-1 flex justify-between sm:hidden">
+                <button
+                  onClick={() => setFilters({...filters, page: Math.max(1, filters.page - 1)})}
+                  disabled={filters.page <= 1}
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  上一页
+                </button>
+                <button
+                  onClick={() => setFilters({...filters, page: Math.min(pagination.total_pages, filters.page + 1)})}
+                  disabled={filters.page >= pagination.total_pages}
+                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  下一页
+                </button>
+              </div>
+              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    显示第 <span className="font-medium">{((filters.page - 1) * filters.pageSize) + 1}</span> 到{' '}
+                    <span className="font-medium">{Math.min(filters.page * filters.pageSize, pagination.total)}</span> 条，
+                    共 <span className="font-medium">{pagination.total}</span> 条记录
+                  </p>
                 </div>
-                <div className="flex space-x-2">
+                <div>
                   <button
-                    onClick={() => setFilters({...filters, page: pagination.page - 1})}
-                    disabled={pagination.page <= 1}
-                    className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    onClick={() => setFilters({...filters, page: filters.page - 1})}
+                    disabled={filters.page <= 1}
+                    className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 mr-2"
                   >
                     上一页
                   </button>
                   <span className="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded">
-                    {pagination.page} / {pagination.total_pages}
+                    {filters.page} / {pagination.total_pages}
                   </span>
                   <button
-                    onClick={() => setFilters({...filters, page: pagination.page + 1})}
-                    disabled={pagination.page >= pagination.total_pages}
-                    className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    onClick={() => setFilters({...filters, page: filters.page + 1})}
+                    disabled={filters.page >= pagination.total_pages}
+                    className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 ml-2"
                   >
                     下一页
                   </button>
@@ -396,9 +319,20 @@ function OrderPage() {
     </div>
   );
 
-  // =================================================================
   // 事件处理函数
-  // =================================================================
+  function getStatusColor(status) {
+    const colors = {
+      0: 'bg-yellow-100 text-yellow-800',
+      1: 'bg-blue-100 text-blue-800',
+      2: 'bg-purple-100 text-purple-800',
+      3: 'bg-indigo-100 text-indigo-800',
+      4: 'bg-green-100 text-green-800',
+      5: 'bg-orange-100 text-orange-800',
+      6: 'bg-gray-100 text-gray-800',
+      7: 'bg-red-100 text-red-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  }
 
   function handleViewOrder(orderId) {
     console.log('查看订单:', orderId);

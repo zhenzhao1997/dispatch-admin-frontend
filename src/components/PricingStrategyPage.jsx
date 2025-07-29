@@ -1,7 +1,10 @@
+// src/components/PricingStrategyPage.jsx
+// 【恢复原版】完整的定价策略页面
+
 import React, { useState } from 'react';
 import { Settings, MapPin, DollarSign, Clock } from 'lucide-react';
 
-// 子组件（稍后实现）
+// 子组件
 import PricingRulesTab from './pricing/PricingRulesTab.jsx';
 import PricingZonesTab from './pricing/PricingZonesTab.jsx';
 import PricingSurchargesTab from './pricing/PricingSurchargesTab.jsx';

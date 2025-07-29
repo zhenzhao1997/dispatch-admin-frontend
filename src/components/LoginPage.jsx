@@ -1,34 +1,20 @@
 // src/components/LoginPage.jsx
 import React, { useState } from 'react';
-import api from '../utils/api.js';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser, clearError, selectAuthLoading, selectAuthError } from '../store/slices/authSlice';
 
-function LoginPage({ onLoginSuccess }) {
+function LoginPage() {
+    const dispatch = useDispatch();
+    const loading = useSelector(selectAuthLoading);
+    const error = useSelector(selectAuthError);
+    
     const [username, setUsername] = useState('superadmin');
     const [password, setPassword] = useState('SuperAdminPwd123!');
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        setIsLoading(true);
-        setError('');
-        
-        try {
-            console.log('🚀 正在尝试登录...', { username });
-            const data = await api.post('/admin/login', { username, password });
-            console.log('✅ 登录成功:', data);
-            
-            if (data && data.token) {
-                onLoginSuccess(data.token);
-            } else {
-                throw new Error('服务器响应格式错误：缺少token');
-            }
-        } catch (err) {
-            console.error('❌ 登录失败:', err);
-            setError(err.message || '登录失败，请稍后重试');
-        } finally {
-            setIsLoading(false);
-        }
+        dispatch(clearError());
+        dispatch(loginUser({ username, password }));
     };
 
     return (
@@ -85,10 +71,10 @@ function LoginPage({ onLoginSuccess }) {
                     <div>
                         <button
                             type="submit"
-                            disabled={isLoading}
+                            disabled={loading}
                             className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {isLoading ? '登录中...' : '登录'}
+                            {loading ? '登录中...' : '登录'}
                         </button>
                     </div>
 

@@ -1,63 +1,85 @@
-// src/App.jsx  
-// 【最简版本】不使用 Redux 和 React Router
+// src/App.jsx
+// 【稳定版本】保持Redux架构完整性的App组件
 
-import React, { useState, useEffect } from 'react';
-import Layout from './components/Layout';
+import React, { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { restoreAuth, selectIsAuthenticated } from './store/slices/authSlice';
+import { selectIsInitialized, selectConstantsLoading, selectConstantsError } from './store/index';
+
+// 组件导入
 import LoginPage from './components/LoginPage';
+import Layout from './components/Layout';
 
 function App() {
-  const [token, setToken] = useState(null);
-  const [currentPage, setCurrentPage] = useState('orders');
-  const [isLoading, setIsLoading] = useState(true);
+  const dispatch = useDispatch();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const isConstantsInitialized = useSelector(selectIsInitialized);
+  const constantsLoading = useSelector(selectConstantsLoading);
+  const constantsError = useSelector(selectConstantsError);
+  
+  const [appInitialized, setAppInitialized] = useState(false);
 
-  // 应用启动时检查认证状态
+  // 应用启动时初始化认证状态
   useEffect(() => {
-    const savedToken = localStorage.getItem('admin_token');
-    setToken(savedToken);
-    setIsLoading(false);
-  }, []);
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      dispatch(restoreAuth({ token }));
+    }
+    setAppInitialized(true);
+  }, [dispatch]);
 
-  // 登录成功处理
-  const handleLoginSuccess = (newToken) => {
-    localStorage.setItem('admin_token', newToken);
-    setToken(newToken);
-  };
-
-  // 登出处理
-  const handleLogout = () => {
-    localStorage.removeItem('admin_token');
-    setToken(null);
-  };
-
-  // 页面导航处理
-  const handleNavigate = (page) => {
-    setCurrentPage(page);
-  };
-
-  // 初始化加载中
-  if (isLoading) {
+  // 应用初始化中
+  if (!appInitialized) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-lg text-gray-600">正在加载...</p>
+          <p className="mt-4 text-lg text-gray-600">正在初始化应用...</p>
         </div>
       </div>
     );
   }
 
+  // 未认证显示登录页
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  // 字典加载中 (可选功能，不阻塞主界面)
+  if (constantsLoading && !isConstantsInitialized) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-lg text-gray-600">正在加载系统配置...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 已认证，显示主界面
+  return <LayoutWrapper />;
+}
+
+// Layout包装器组件
+function LayoutWrapper() {
+  const [currentPage, setCurrentPage] = useState('orders');
+  const dispatch = useDispatch();
+
+  const handleLogout = () => {
+    dispatch({ type: 'auth/logout' });
+  };
+
+  const handleNavigate = (page) => {
+    setCurrentPage(page);
+  };
+
   return (
-    <div className="h-full">
-      {token ? (
-        <Layout 
-          currentPage={currentPage}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-        />
-      ) : (
-        <LoginPage onLoginSuccess={handleLoginSuccess} />
-      )}
-    </div>
+    <Layout 
+      currentPage={currentPage}
+      onNavigate={handleNavigate}
+      onLogout={handleLogout}
+    />
   );
 }
 
