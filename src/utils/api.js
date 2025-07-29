@@ -1,4 +1,4 @@
-// 修复版本 - 移除 process.env 依赖
+// src/utils/api.js
 const API_BASE_URL = 'http://localhost:8080/v1';
 
 console.log('🔗 API地址配置:', API_BASE_URL);
