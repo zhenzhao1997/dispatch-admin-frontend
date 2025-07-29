@@ -1,13 +1,15 @@
+// src/components/Layout.jsx
 import React from 'react';
 import DashboardContent from './DashboardContent.jsx';
 import DriverPage from './DriverPage.jsx';
 import OrderPage from './OrderPage.jsx';
 import VehiclePage from './VehiclePage.jsx';
-
+import MonitorPage from './MonitorPage.jsx';  // 新增
 
 function Layout({ currentPage, onNavigate, onLogout }) {
     const navItems = [
         { id: 'dashboard', name: '仪表盘', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/> },
+        { id: 'monitor', name: '实时监控', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/> }, // 新增
         { id: 'orders', name: '订单管理', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /> },
         { id: 'drivers', name: '司机管理', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /> },
         { id: 'vehicles', name: '车辆管理', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 4h5m-5 4h5" /> }
@@ -40,6 +42,7 @@ function Layout({ currentPage, onNavigate, onLogout }) {
                 </header>
                 <main className="flex-1 p-8 bg-gray-100 overflow-y-auto">
                    {currentPage === 'dashboard' && <DashboardContent />}
+                   {currentPage === 'monitor' && <MonitorPage />}      {/* 新增 */}
                    {currentPage === 'orders' && <OrderPage />}
                    {currentPage === 'drivers' && <DriverPage />}
                    {currentPage === 'vehicles' && <VehiclePage />}
